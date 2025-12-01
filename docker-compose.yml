@@ -1,17 +1,55 @@
 services:
+  crowdsec-db:
+    image: postgres:15
+    container_name: crowdsec-postgres
+    environment:
+      POSTGRES_USER: crowdsec
+      POSTGRES_PASSWORD: crowdsec
+      POSTGRES_DB: crowdsec
+    volumes:
+      - crowdsec-db-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432" # exposé pour Metabase
+
   crowdsec:
     image: crowdsecurity/crowdsec:latest
-    restart: unless-stopped
+    container_name: crowdsec
+    depends_on:
+      - crowdsec-db
+    restart:
+      unless-stopped
+    environment:
+      CS_DB_TYPE: pgsql
+      CS_DB_HOST: crowdsec-db
+      CS_DB_USER: crowdsec
+      CS_DB_PASSWORD: crowdsec
+      CS_DB_NAME: crowdsec
+      CS_DB_PORT: 5432
     ports:
       - "8080:8080"
-    environment:
-      COLLECTIONS: "crowdsecurity/nginx"
-      GID: "${GID-1000}"
     volumes:
-      - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml
-      - logs:/var/log/nginx
-      - crowdsec-db:/var/lib/crowdsec/data/
+      - crowdsec-data:/var/lib/crowdsec/data
+      - crowdsec-config:/etc/crowdsec
+
+  metabase:
+    image: metabase/metabase:latest
+    container_name: metabase
+    depends_on:
+      - crowdsec-db
+    restart: 
+      unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_HOST: crowdsec-db
+      MB_DB_PORT: 5432
+      MB_DB_DBNAME: crowdsec
+      MB_DB_USER: crowdsec
+      MB_DB_PASS: crowdsec
+
 
 volumes:
-  logs:
-  crowdsec-db:
+  crowdsec-db-data:
+  crowdsec-data:
+  crowdsec-config:
